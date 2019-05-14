@@ -1,0 +1,204 @@
+import React, {Component} from 'react'
+import {Form, Input, Radio, Button, DatePicker} from 'antd'
+import {connect} from 'react-redux'
+import {createUser} from '../actions/userActions'
+import {addFlashMessage} from '../actions/flashMessages'
+import PropTypes from 'prop-types'
+import moment from 'moment'
+
+const dateFormat = 'MM/DD/YYYY';
+
+class Signup extends Component {
+    componentDidMount(){
+        this.setInitialValues();
+    }
+    state = {
+        conf_value: false
+    };
+
+    setInitialValues = () => {
+        const { form } = this.props;
+        form.setFieldsValue({
+            bday: moment('01/30/1996', dateFormat),
+        });
+    };
+
+    onChange = (e) => {
+        this.setState({
+            [e.target.name]: e.target.value
+        });
+        /* redirect to page there is a need to extract contextTypes first*/
+        //this.context.router.history.push('/');
+    };
+
+    onSubmit = (e) => {
+        e.preventDefault();
+        const { form, addFlashMessage, createUser, toggle } = this.props;
+        form.validateFieldsAndScroll((err, values) => {
+            if (!err) {
+                values.bday = moment(values.bday._d).format('L');
+                createUser(values).then(
+                    (res) => {
+                        if (res.data === 'Mail has been sent'){
+                            addFlashMessage({
+                                type: 'success',
+                                text: 'You sign up successfully. Check your email for link activation'
+                            });
+                            toggle();
+                        }
+                        else if(res.data === 'Email exists') {
+                            addFlashMessage({
+                                type: 'error',
+                                text: 'User with this email already exists'
+                            });
+                        }
+                    })
+            }
+        })
+    };
+
+    validateToNextPassword = (rule, value, callback) => {
+        const form = this.props.form;
+        if (value && this.state.conf_value) {
+            form.validateFields(['confirm_password'], {force: true});
+        }
+        callback();
+    };
+
+    handleBlur = (e) => {
+        const value = e.target.value;
+        this.setState({conf_value: this.state.conf_value || !!value});
+    };
+
+    validateComplex = (rule, value, callback) => {
+        const pattern = /^(?=.*\d)(?=.*[a-z])\w{6,}$/;
+        if (value) {
+            if (pattern.test(value)) {
+                callback();
+            } else {
+                callback(`${rule.field} must contain at least one number and
+                       lowercase letter, and at least 6 or more characters`);
+            }
+        } else {
+            callback();
+        }
+    };
+
+    compareToFirstPassword = (rule, value, callback) => {
+        const form = this.props.form;
+        if (value && value !== form.getFieldValue('password')) {
+            callback('Two passwords that you enter is inconsistent');
+        } else {
+            callback();
+        }
+    };
+
+    validateAge = (rule, value, callback) => {
+        if (value) {
+            const date = moment(value._d);
+            const age = moment().diff(date, 'years');
+            if (age < 17) {
+                callback('You must be at least 17 years old to register');
+            } else {
+                callback();
+            }
+        }
+    };
+
+    render() {
+        const {getFieldDecorator} = this.props.form;
+        const formItemLayout      = {
+            labelCol: {
+                xs: {span: 24},
+                sm: {span: 8}
+            },
+            wrapperCol: {
+                xs: {span: 24},
+                sm: {span: 16}
+            }
+        };
+
+        return (
+            <div>
+                <Form className="App-form" onSubmit={this.onSubmit}>
+                    <Form.Item {...formItemLayout} label='E-mail' hasFeedback> {
+                        getFieldDecorator('email', {
+                            rules: [{type: 'email', message: 'e-mail is not valid'},
+                                    {required: true, message: 'Please input your E-mail'}]
+                        })(<Input name='email'/>)
+                    }
+                    </Form.Item>
+                    <Form.Item {...formItemLayout} label='Username' hasFeedback> {
+                        getFieldDecorator('username', {
+                            rules: [{required: true, message: 'Please input your Username'},
+                                {min: 2, message:'Username is too short'},
+                                {max: 20, message:'Username is too long'}]
+                        })(<Input name='username'/>)
+                    }
+                    </Form.Item>
+                    <Form.Item {...formItemLayout} label='First name' hasFeedback> {
+                        getFieldDecorator('firstname', {
+                            rules: [{required: true, message: 'Please input your first name'},
+                                {min: 2, message:'First name is too short'},
+                                {max: 30, message:'First name is too long'}]
+                        })(<Input name='firstname'/>)
+                    }
+                    </Form.Item>
+                    <Form.Item {...formItemLayout} label='Last name' hasFeedback> {
+                        getFieldDecorator('lastname', {
+                            rules: [{required: true, message: 'Please input your last name'},
+                                {min: 2, message:'Last name is too short'},
+                                {max: 50, message:'Last name is too long'}]
+                        })(<Input name='lastname'/>)
+                    }
+                    </Form.Item>
+                    <Form.Item {...formItemLayout} label='Gender'> {
+                        getFieldDecorator('gender', {
+                            rules: [{required: true, message: 'Please select your gender'}]
+                        })(<Radio.Group name='gender'>
+                            <Radio value='male'>Male</Radio>
+                            <Radio value='female'>Female</Radio>
+                        </Radio.Group>)
+                    }
+                    </Form.Item>
+                    <Form.Item {...formItemLayout} label='Birth day'> {
+                        getFieldDecorator('bday',{
+                            rules:[{required: true, message: 'Please indicate your birth day'},
+                                {validator: this.validateAge}]
+                        })(<DatePicker format={dateFormat} />)
+                    }
+                    </Form.Item>
+                    <Form.Item {...formItemLayout} label='Password' hasFeedback> {
+                        getFieldDecorator('password', {
+                            rules: [{
+                                required: true, message: 'Please input your password'},
+                                {validator: this.validateComplex},
+                                {validator: this.validateToNextPassword}]
+                        })(<Input name='password' type='password'/>)
+                    }
+                    </Form.Item>
+                    <Form.Item {...formItemLayout} label="Confirm Password">{
+                        getFieldDecorator('confirm_password', {
+                            rules: [{required: true, message: 'Please confirm your password'},
+                                {validator: this.compareToFirstPassword}]
+                        })(<Input name='confirm_password' type='password'
+                                  onBlur={this.handleBlur}
+                                  onChange={e => this.onChange(e)}/>
+                        )}
+                    </Form.Item>
+                    <Button className="App-button" type='primary'
+                            htmlType='submit'>Sign up</Button>
+                </Form>
+            </div>
+        )
+    }
+}
+
+Signup.propTypes = {
+    createUser: PropTypes.func.isRequired,
+    addFlashMessage: PropTypes.func.isRequired,
+    toggle: PropTypes.func.isRequired
+};
+
+
+export default connect(null, {createUser, addFlashMessage})(Form.create()(Signup));
